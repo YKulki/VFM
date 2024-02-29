@@ -409,12 +409,12 @@ def calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeform
         def U_star_devX(d, z, x):
             t=z/H
             R=a_0*t
-            return c*t*(-(k*np.exp(-k*(d-R))/(1+np.exp(-k*(d-R)))**2))*x*d**(-1/2)
+            return -c*t*((k*np.exp(-k*(d-R))*(1+np.exp(-k*(d-R)))**-2))*x*d**(-1/2)
 
         def U_star_devY(d, z, y):
             t=z/H
             R=a_0*t
-            return c*t*(-(k*np.exp(-k*(d-R))/(1+np.exp(-k*(d-R)))**2))*y*d**(-1/2)
+            return -c*t*((k*np.exp(-k*(d-R))*(1+np.exp(-k*(d-R)))**-2))*y*d**(-1/2)
             
         def U_star_devZ(d, z):
             t=z/H
