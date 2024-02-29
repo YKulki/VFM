@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import time 
 import math
+import os
 
 initial = time.time()
 
@@ -25,8 +26,8 @@ depth_indentation = 1e-4
 sphere_radius = 1e-3
 
 # Force = (4/3)*E*(sphere_radius**(1/2))*(depth_indentation**(3/2))
-# Force=0.3
-force_list=np.linspace(0.2,0.4,21)
+Force=0.3
+# force_list=np.linspace(0.2,0.4,21)
 
 a_0 = 3.6 #contact radius
 
@@ -322,8 +323,8 @@ def calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeform
     for i in range(rows):
         for j in range(cols):
            for k in range(deps):
-                if i==0 and j==0 and k==0:
-                    print(tensor_displacement_list[i][j][k])
+                # if i==0 and j==0 and k==0:
+                #     print(tensor_displacement_list[i][j][k])
                 deformation_gradients[i][j][k] =deformation_gradients[i][j][k]+ I
 
     
@@ -423,12 +424,12 @@ def calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeform
         du1_dX1 = U_star_devX(np.sqrt(X1**2 + X2**2), X3, X1)
         du1_dX2 = U_star_devY(np.sqrt(X1**2 + X2**2), X3, X2)
         du1_dX3 = U_star_devZ(np.sqrt(X1**2 + X2**2), X3)
-        du2_dX1 = du1_dX1
-        du2_dX2 = du1_dX2
-        du2_dX3 = du1_dX3
-        du3_dX1 = du1_dX1
-        du3_dX2 = du1_dX2
-        du3_dX3 = du1_dX3
+        du2_dX1 = 0
+        du2_dX2 = 0
+        du2_dX3 = 0
+        du3_dX1 = 0
+        du3_dX2 = 0
+        du3_dX3 = 0
 
         # Calculate internal virtual work for second set of virtual fields Π : ∂û/∂X 
         # ivw_1 = (sigma[0, 0] * du1_dX1_1 + sigma[1, 0] * du2_dX1_1 + sigma[0, 1] * du1_dX2_1 + sigma[1, 1] * du2_dX2_1)*(cube_size[0]*cube_size[1]*cube_size[2])
@@ -452,8 +453,8 @@ def calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeform
     # evw_1 = (-2 * force * L)
 
     # Calculate external virtual work for second set of virtual fields 
-    evw_2 = (- Force*U_star(0,H) )
-    print(U_star(0,H))
+    evw_2 = (- Force*0 )
+    # print(U_star(0,H))
     # print(evw_1)
     print(evw_2)
 
@@ -525,17 +526,17 @@ def main():
     # tensor_displacement_list = map_elements_to_centraldiff(matrix, displacement_centroids, dUx_dx, dUy_dx, dUz_dx, dUx_dy, dUy_dy, dUz_dy, dUx_dz, dUy_dz, dUz_dz)
     # np.save('tensor_displacement_list.npy',tensor_displacement_list)
     
-
+    os.chdir(r"C:\Users\yuvamk2\OneDrive - University of Illinois - Urbana\MS Thesis Files\UIUC MS Thesis Files\Codes\VFM")
     tensor_displacement_list=np.load('tensor_displacement_list.npy',allow_pickle=True)
     matrix=np.load('matrix.npy',allow_pickle=True)
     undeformed_centroids=np.load('undeformed_centroids.npy',allow_pickle=True)
     cube_size=np.load('cube_size.npy',allow_pickle=True)
-    phi_list=[]
-    for F in force_list:
-        phi = calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size,F)
-        phi_list.append(phi)
-    np.save('phi_list_vf2_2_force',phi_list)
-    # calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size)
+    # phi_list=[]
+    # for F in force_list:
+    #     phi = calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size,F)
+    #     phi_list.append(phi)
+    # np.save('phi_list_vf2_2_force',phi_list)
+    calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size,Force)
    
     # dUx_dx, dUy_dx, dUz_dx, dUx_dy, dUy_dy, dUz_dy, dUx_dz, dUy_dz, dUz_dz = central_differenciation(Ux_enlarged, Uy_enlarged, Uz_enlarged, cube_size)
 
