@@ -7,16 +7,15 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import time 
 import math
-import os
 
 initial = time.time()
 
 
 decimal_places = 10
 index = 0
-E = 7.143e6
+# E = 7.143e6
 
-# E_list=np.linspace(6e6,8e6,21)
+E_list=np.linspace(6e6,8e6,21)
 # E_list=np.array([7.14e6,7.14e6])
 # E_list.append(7.143e6)
 
@@ -399,27 +398,46 @@ def calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeform
         c=1
         k=1.5
         m=1
+        a=0.3
 
         def U_star(d, z):
             t=z/H
-            R=a_0*t
-            return c*t*(1-(1/(1+np.exp(-k*(d-R)))))
+            if d<=a:
+                return c*t
+            elif d>a and d<L/2:
+                return (-2*c/(L-2*a))*d*t + (c*L/(L-2*a))*t
+            else:
+                return 0
             
             
         def U_star_devX(d, z, x):
             t=z/H
-            R=a_0*t
-            return c*t*(-(k*np.exp(-k*(d-R))/(1+np.exp(-k*(d-R)))**2))*x*d**(-1/2)
-
+            if d<=a:
+                return 0
+            elif d>a and d<L/2:
+                return (-2*c*x*t/((L-2*a)*d))
+            else:
+                return 0
         def U_star_devY(d, z, y):
             t=z/H
-            R=a_0*t
-            return c*t*(-(k*np.exp(-k*(d-R))/(1+np.exp(-k*(d-R)))**2))*y*d**(-1/2)
+            if d<=a:
+                return 0
+            elif d>a and d<L/2:
+                return (-2*c*y*t/((L-2*a)*d))
+            else:
+                return 0
+            
+
             
         def U_star_devZ(d, z):
             t=z/H
-            R=a_0*t
-            return c/H*(1-(1/(1+np.exp(-k*(d-R)))))
+            t=z/H
+            if d<=a:
+                return c/H
+            elif d>a and d<L/2:
+                return (-2*c*H*L*d+c*H*L**2)/(L*H-2*z*a)**2
+            else:
+                return 0
 
         du1_dX1 = U_star_devX(np.sqrt(X1**2 + X2**2), X3, X1)
         du1_dX2 = U_star_devY(np.sqrt(X1**2 + X2**2), X3, X2)
@@ -526,17 +544,17 @@ def main():
     # tensor_displacement_list = map_elements_to_centraldiff(matrix, displacement_centroids, dUx_dx, dUy_dx, dUz_dx, dUx_dy, dUy_dy, dUz_dy, dUx_dz, dUy_dz, dUz_dz)
     # np.save('tensor_displacement_list.npy',tensor_displacement_list)
     
-    os.chdir(r"C:\Users\yuvamk2\OneDrive - University of Illinois - Urbana\MS Thesis Files\UIUC MS Thesis Files\Codes\VFM")
+
     tensor_displacement_list=np.load('tensor_displacement_list.npy',allow_pickle=True)
     matrix=np.load('matrix.npy',allow_pickle=True)
     undeformed_centroids=np.load('undeformed_centroids.npy',allow_pickle=True)
     cube_size=np.load('cube_size.npy',allow_pickle=True)
-    # phi_list=[]
-    # for F in force_list:
-    #     phi = calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size,F)
-    #     phi_list.append(phi)
-    # np.save('phi_list_vf2_2_force',phi_list)
-    calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size,Force)
+    phi_list=[]
+    for E in E_list:
+        phi = calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size,Force)
+        phi_list.append(phi)
+    np.save('phi_list_vf3_E',phi_list)
+    # calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size)
    
     # dUx_dx, dUy_dx, dUz_dx, dUx_dy, dUy_dy, dUz_dy, dUx_dz, dUy_dz, dUz_dz = central_differenciation(Ux_enlarged, Uy_enlarged, Uz_enlarged, cube_size)
 

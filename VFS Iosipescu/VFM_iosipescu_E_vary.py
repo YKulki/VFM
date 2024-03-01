@@ -5,43 +5,23 @@ import csv
 import sys
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import time 
-import math
-import os
-
-initial = time.time()
 
 
 decimal_places = 10
+force = -700
 index = 0
-E = 7.143e6
-
-# E_list=np.linspace(6e6,8e6,21)
-# E_list=np.array([7.14e6,7.14e6])
-# E_list.append(7.143e6)
-
+# E = 2.4e6
+E_list=np.linspace(1e6,1e7,num=20)
 v = 0.48
-# E_star = E/(1-(v**2))
-depth_indentation = 1e-4
-sphere_radius = 1e-3
+L = 0.03 # Length in meters
+H = 0.019 # Height in meters
+D = 0.0023 # Depth in meters
 
-# Force = (4/3)*E*(sphere_radius**(1/2))*(depth_indentation**(3/2))
-Force=0.3
-# force_list=np.linspace(0.2,0.4,21)
-
-a_0 = 3.6 #contact radius
-
-constant = 1 # arbitrary constant value
-
-L = 0.0075 # Length in meters
-H = 0.003 # Height in meters
-D = L # Depth in meters
-
-df = pd.read_csv('250k.csv')
+df = pd.read_csv('linearelastic_82k.csv')
 df.head()
 df=df.drop(columns=['ODB Name', 'Step', 'Frame', 'Section Name', 'Material Name', 'Section Point','X','Y','Z','   U-Magnitude'],axis=1)
 
-nodes_displacement=df.loc[df['Part Instance Name'] == 'TISSUE-1']
+nodes_displacement=df.loc[df['Part Instance Name'] == 'PART-1-1']
 nodes_displacement=nodes_displacement.drop('Part Instance Name',axis=1)
 
 # print(nodes_displacement.head())
@@ -59,7 +39,7 @@ def read_file(file_path):
     for line in Lines:
         line=line.strip()
 
-        if line.startswith('*') and line.startswith('*Part, name=tissue'):
+        if line.startswith('*') and line.startswith('*Part, name=Part-1'):
             flag=1
             continue
         elif line.startswith('*Node') and flag==1:
@@ -312,21 +292,17 @@ def map_elements_to_centraldiff(elements_tensor, displacement_centroids, dUx_dx,
     return tensor_displacement_list
 
 
-def calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size,Force):
-    deformation_gradients = np.array(tensor_displacement_list)
+def calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size):
+    deformation_gradients = tensor_displacement_list
     # Identity matrix (3x3)
     rows = len(tensor_displacement_list)
     cols = len(tensor_displacement_list[0])
     deps = len(tensor_displacement_list[0][0])
     I = np.eye(3)
-
     for i in range(rows):
         for j in range(cols):
            for k in range(deps):
-                if i==0 and j==0 and k==0:
-                    print(tensor_displacement_list[i][j][k])
-                deformation_gradients[i][j][k] =deformation_gradients[i][j][k]+ I
-
+                deformation_gradients[i][j][k] += I
     
     deformation_2d_list = []
     for i in range(rows):
@@ -345,31 +321,24 @@ def calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeform
                dUz_dz = deformation_gradient[2][2]
                deformation_1d_list = [element_number, dUx_dx, dUx_dy, dUx_dz, dUy_dx, dUy_dy, dUy_dz, dUz_dx, dUz_dy, dUz_dz]
                deformation_2d_list.append(deformation_1d_list)
-
     
-        # deformation_2d_list.sort()
-        # filename = 'deformation_gradients_2d.csv'
-        # with open(filename, 'w', newline='') as file:
-        #     writer = csv.writer(file)
-        #     for row in deformation_2d_list:
-        #         writer.writerow(row)
+    deformation_2d_list.sort()
+    # filename = 'deformation_gradients_2d.csv'
+    # with open(filename, 'w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     for row in deformation_2d_list:
+    #         writer.writerow(row)
     
-    pi = []
     IVW_1 = []
     IVW_2 = []
 
-
-
-    c_reshaped=np.zeros((3,3))
-    e=np.zeros((3,3))
-    sigma=np.zeros((3,3))
-    pk1=np.zeros((3,3))
-    size = 251464
+    size = 82080
     deformation_2d_array = np.zeros((size, 9), dtype=float)
     pk1_2d_list = np.zeros((size, 9)) #change row number accordingly 
     e_2d_list = np.zeros((size, 9)) #change row number accordingly 
     c_2d_list = np.zeros((size, 9)) #change row number accordingly 
     for i in range(size):
+        c_reshaped = np.zeros((3,3), dtype=float)
         c_reshaped[0,0] = deformation_2d_list[i][1]
         c_reshaped[0,1] = deformation_2d_list[i][2]
         c_reshaped[0,2] = deformation_2d_list[i][3]
@@ -385,82 +354,66 @@ def calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeform
         inverse_transpose = np.linalg.inv(c_reshaped.T)
         J = np.linalg.det(c_reshaped)
         pk1 = J*np.dot(sigma,inverse_transpose)
-        
-            
+
 
       # Calculate X1 and X2 for each centroid
-        X1 = undeformed_centroids[i][1]-L/2
-        X2 = undeformed_centroids[i][2]-L/2
-        X3 = undeformed_centroids[i][3]
+        X1 = undeformed_centroids[i][1]
+        X2 = undeformed_centroids[i][2]
 
+        # First set of virtual fields and their derivatives
+        u1_1 = 0
+        u2_1 = -X1
+
+        du1_dX1_1 = 0
+        du1_dX2_1 = 0
+        du2_dX1_1 = -1
+        du2_dX2_1 = 0
 
         # Second set of virtual fields and their derivatives
+        u1_2 = X1 * (L - X1) * X2
+        u2_2 = (X1**3 / 3) - L * (X1**2 / 2)
 
-        c=1
-        k=1.5
-        m=1
+        du1_dX1_2 = (L - 2*X1) * X2
+        du1_dX2_2 = X1 * (L - X1)
+        du2_dX1_2 = X1**2 - L * X1
+        du2_dX2_2 = 0
 
-        def U_star(d, z):
-            t=z/H
-            R=a_0*t
-            return c*t*(1-(1/(1+np.exp(-k*(d-R)))))
-            
-            
-        def U_star_devX(d, z, x):
-            t=z/H
-            R=a_0*t
-            return c*t*(-(k*np.exp(-k*(d-R))/(1+np.exp(-k*(d-R)))**2))*x*d**(-1/2)
+        # # Calculate internal virtual work for first set of virtual fields Π : ∂û/∂X 
+        # ivw_1 = (pk1[0, 0] * du1_dX1_1 + pk1[1, 0] * du2_dX1_1 + pk1[0, 1] * du1_dX2_1 + pk1[1, 1] * du2_dX2_1)*(cube_size[0]*cube_size[1]*cube_size[2])
 
-        def U_star_devY(d, z, y):
-            t=z/H
-            R=a_0*t
-            return c*t*(-(k*np.exp(-k*(d-R))/(1+np.exp(-k*(d-R)))**2))*y*d**(-1/2)
-            
-        def U_star_devZ(d, z):
-            t=z/H
-            R=a_0*t
-            return c/H*(1-(1/(1+np.exp(-k*(d-R)))))
+        # # Calculate internal virtual work for second set of virtual fields Π : ∂û/∂X 
+        # ivw_2 = (pk1[0, 0] * du1_dX1_2 + pk1[1, 0] * du2_dX1_2 + pk1[0, 1] * du1_dX2_2 + pk1[1, 1] * du2_dX2_2)*(cube_size[0]*cube_size[1]*cube_size[2])
 
-        du1_dX1 = U_star_devX(np.sqrt(X1**2 + X2**2), X3, X1)
-        du1_dX2 = U_star_devY(np.sqrt(X1**2 + X2**2), X3, X2)
-        du1_dX3 = U_star_devZ(np.sqrt(X1**2 + X2**2), X3)
-        du2_dX1 = du1_dX1
-        du2_dX2 = du1_dX2
-        du2_dX3 = du1_dX3
-        du3_dX1 = du1_dX1
-        du3_dX2 = du1_dX2
-        du3_dX3 = du1_dX3
+        # Calculate internal virtual work for first set of virtual fields Π : ∂û/∂X 
+        ivw_1 = (sigma[0, 0] * du1_dX1_1 + sigma[1, 0] * du2_dX1_1 + sigma[0, 1] * du1_dX2_1 + sigma[1, 1] * du2_dX2_1)*(cube_size[0]*cube_size[1]*cube_size[2])
 
         # Calculate internal virtual work for second set of virtual fields Π : ∂û/∂X 
-        # ivw_1 = (sigma[0, 0] * du1_dX1_1 + sigma[1, 0] * du2_dX1_1 + sigma[0, 1] * du1_dX2_1 + sigma[1, 1] * du2_dX2_1)*(cube_size[0]*cube_size[1]*cube_size[2])
-
-        # Calculate internal virtual work for second set of virtual fields Π : ∂û/∂X 
-        ivw_2 = (pk1[0, 0] * du1_dX1 + pk1[1, 0] * du2_dX1 + pk1[2, 0] * du3_dX1 + pk1[0, 1] * du1_dX2 + pk1[1, 1] * du2_dX2 + pk1[2, 1] * du3_dX2 + pk1[0, 2] * du1_dX3 + pk1[1, 2] * du2_dX3 + pk1[2, 2] * du3_dX3)*(cube_size[0]*cube_size[1]*cube_size[2])
+        ivw_2 = (sigma[0, 0] * du1_dX1_2 + sigma[1, 0] * du2_dX1_2 + sigma[0, 1] * du1_dX2_2 + sigma[1, 1] * du2_dX2_2)*(cube_size[0]*cube_size[1]*cube_size[2])  
 
 
-        # IVW_1.append(ivw_1)
+        IVW_1.append(ivw_1)
         IVW_2.append(ivw_2)
           
         
-        
-    # total_IVW_1 = np.sum(IVW_1)
+    total_IVW_1 = np.sum(IVW_1)
     total_IVW_2 = np.sum(IVW_2)
 
-    # print(total_IVW_1)
+    print(total_IVW_1)
     print(total_IVW_2)
     # Calculate external virtual work for first set of virtual fields 
 
-    # evw_1 = (-2 * force * L)
+    evw_1 = (- force * L)
 
     # Calculate external virtual work for second set of virtual fields 
-    evw_2 = (- Force*U_star(0,H) )
-    print(U_star(0,H))
-    # print(evw_1)
+    evw_2 = (- force * L**3 / 6)
+
+    print(evw_1)
     print(evw_2)
 
     # Cost function
-    phi =  np.sqrt((total_IVW_2 - evw_2) ** 2)
-
+    phi = (total_IVW_1 - evw_1) ** 2 + (total_IVW_2 - evw_2) ** 2
+    
+    
     print(phi)
     return phi
 
@@ -486,58 +439,55 @@ def save_1d_array_to_csv(array_1d, filename):
 
 def main():
     
-    # file_path_undeformed = "250k.inp"
+    file_path_undeformed = "MR_Concentrated.inp"
 
-    # decimal_places=8
-    # undeformed_nodes, connectivity = read_file(file_path_undeformed)
-    # # print(undeformed_nodes)
-    # nodes_deformed=calculate_nodes_deformed(undeformed_nodes,nodes_displacement)
+    decimal_places=8
+    undeformed_nodes, connectivity = read_file(file_path_undeformed)
+    # print(undeformed_nodes)
+    nodes_deformed=calculate_nodes_deformed(undeformed_nodes,nodes_displacement)
 
-    # undeformed_centroids=create_centroids(undeformed_nodes, connectivity)
-    # np.save('undeformed_centroids.npy',undeformed_centroids)
+    undeformed_centroids=create_centroids(undeformed_nodes, connectivity)
 
-    # deformed_centroids=create_centroids(nodes_deformed, connectivity)
+    deformed_centroids=create_centroids(nodes_deformed, connectivity)
 
-    # cube_size=calculate_cube_size(undeformed_centroids,decimal_places)
-    # np.save('cube_size.npy',cube_size)
+    cube_size=calculate_cube_size(undeformed_centroids,decimal_places)
 
-    # matrix = map_elements_to_matrix(undeformed_centroids,cube_size)
-    # # print(np.shape(nodes_deformed))
-    # np.save('matrix.npy',matrix)
+    matrix = map_elements_to_matrix(undeformed_centroids,cube_size)
+    # print(np.shape(nodes_deformed))
 
+    displacement_centroids=deformed_centroids
+    displacement_centroids[:,1:4]=deformed_centroids[:,1:4]-undeformed_centroids[:,1:4]
+    # print(np.shape(displacement_centroids))
 
-    # displacement_centroids=deformed_centroids
-    # displacement_centroids[:,1:4]=deformed_centroids[:,1:4]-undeformed_centroids[:,1:4]
-    
-    
-    # # print(np.shape(displacement_centroids))
-    # np.save('displacement_centroids.npy',displacement_centroids)
+    Ux,Uy,Uz=map_elements_to_displacement(matrix,displacement_centroids)
 
-    # Ux,Uy,Uz=map_elements_to_displacement(matrix,displacement_centroids)
+    Ux_enlarged = increase_matrix_size(Ux)
+    Uy_enlarged = increase_matrix_size(Uy)
+    Uz_enlarged = increase_matrix_size(Uz)
 
-    # Ux_enlarged = increase_matrix_size(Ux)
-    # Uy_enlarged = increase_matrix_size(Uy)
-    # Uz_enlarged = increase_matrix_size(Uz)
+    # print(np.shape(Ux))
 
-    # # print(np.shape(Ux))
+    dUx_dx, dUy_dx, dUz_dx, dUx_dy, dUy_dy, dUz_dy, dUx_dz, dUy_dz, dUz_dz = central_differenciation(Ux_enlarged, Uy_enlarged, Uz_enlarged, cube_size)
+    # print(np.shape(dUx_dx))
+    tensor_displacement_list = map_elements_to_centraldiff(matrix, displacement_centroids, dUx_dx, dUy_dx, dUz_dx, dUx_dy, dUy_dy, dUz_dy, dUx_dz, dUy_dz, dUz_dz)
 
-    # dUx_dx, dUy_dx, dUz_dx, dUx_dy, dUy_dy, dUz_dy, dUx_dz, dUy_dz, dUz_dz = central_differenciation(Ux_enlarged, Uy_enlarged, Uz_enlarged, cube_size)
-    # # print(np.shape(dUx_dx))
-    # tensor_displacement_list = map_elements_to_centraldiff(matrix, displacement_centroids, dUx_dx, dUy_dx, dUz_dx, dUx_dy, dUy_dy, dUz_dy, dUx_dz, dUy_dz, dUz_dz)
-    # np.save('tensor_displacement_list.npy',tensor_displacement_list)
-    
-    os.chdir(r"C:\Users\yuvamk2\OneDrive - University of Illinois - Urbana\MS Thesis Files\UIUC MS Thesis Files\Codes\VFM")
-    tensor_displacement_list=np.load('tensor_displacement_list.npy',allow_pickle=True)
-    matrix=np.load('matrix.npy',allow_pickle=True)
-    undeformed_centroids=np.load('undeformed_centroids.npy',allow_pickle=True)
-    cube_size=np.load('cube_size.npy',allow_pickle=True)
-    # phi_list=[]
-    # for F in force_list:
-    #     phi = calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size,F)
-    #     phi_list.append(phi)
-    # np.save('phi_list_vf2_2_force',phi_list)
-    calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size,Force)
-   
+    phi=[]
+    for E in E_list:
+        phi.append(calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size))
+    phi=np.array(phi)
+    np.save('phi.npy',phi)
+    # calculate_deformation_gradient(tensor_displacement_list, matrix,E,v,undeformed_centroids,cube_size)
+    plt.plot(E_list,phi)
+    # # Save the enlarged displacement matrices to CSV files
+    # filename_Ux = 'Ux_enlarged.csv'
+    # save_3d_matrix_enalrged_to_csv(Ux_enlarged, filename_Ux)
+
+    # filename_Uy = 'Uy_enlarged.csv'
+    # save_3d_matrix_enalrged_to_csv(Uy_enlarged, filename_Uy)
+
+    # filename_Uz = 'Uz_enlarged.csv'
+    # save_3d_matrix_enalrged_to_csv(Uz_enlarged, filename_Uz)
+
     # dUx_dx, dUy_dx, dUz_dx, dUx_dy, dUy_dy, dUz_dy, dUx_dz, dUy_dz, dUz_dz = central_differenciation(Ux_enlarged, Uy_enlarged, Uz_enlarged, cube_size)
 
     # tensor_displacement_list = map_elements_to_centraldiff(matrix, displacement_centroids, dUx_dx, dUy_dx, dUz_dx, dUx_dy, dUy_dy, dUz_dy, dUx_dz, dUy_dz, dUz_dz)
@@ -558,9 +508,6 @@ def main():
     # # print("dUx_dx for the first element:")
     # # print(dUx_dx[0, 0, 0])  # Adjust the indices as needed to access other elements
 
-    end = time.time()
-    elapsed_time = end - initial
-    # print(elapsed_time)
 
 if __name__ == "__main__":
     main()
